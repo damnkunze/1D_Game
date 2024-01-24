@@ -1,40 +1,7 @@
 void endGame() {
   Serial.println("GAME CRASHED");
+  delay(1000);
   exit(1);
-}
-
-void setupLevel() {
-  // Clear arrays
-  for (int i = 0; i <= MAX_BULLETS; i++) {
-    free(bullets[i]);
-    bullets[i] = NULL;
-  }
-  for (int i = 0; i <= MAX_ENEMY_COUNT; i++) {
-    free(enemies[i]);
-    enemies[i] = NULL;
-  }
-
-  enemyCount = 2 * level;
-  playerPos = spawnpoint;
-
-  // Spawn enemies
-  for (int i = 0; i <= enemyCount; i++) {
-    enemy* new_enemy = calloc(1, sizeof(enemy));
-    if (new_enemy == NULL) endGame();
-    new_enemy -> pos = random(spawnpoint + enemyRange, NUM_LEDS);
-    new_enemy -> lives = enemyLives;
-    new_enemy -> color = enemyBaseColor;
-
-    enemies[i] = new_enemy;
-  }
-  
-  // Entry animation
-  for (int i = 0; i <= spawnpoint; i++) {
-    if (i > 0) leds[i - 1] = blankPixel;
-    leds[i] = playerColor;
-    FastLED.show();
-    FastLED.delay(1000 / (UPDATES_PER_SECOND / 3));
-  }
 }
 
 CRGB getPlayerColor(CRGB color) {
@@ -56,6 +23,16 @@ CRGB getPlayerColor(CRGB color) {
 void clearStripe() {
   for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = blankPixel;
+  }
+}
+
+
+void entryAnimation(int pos, CRGB color, CRGB blankPixel) {
+  for (int i = 0; i <= pos; i++) {
+    if (i > 0) leds[i - 1] = blankPixel;
+    leds[i] = color;
+    FastLED.show();
+    FastLED.delay(1000 / (UPDATES_PER_SECOND / 3));
   }
 }
 
@@ -96,6 +73,14 @@ void loseAnimation(int pos) {
 
 void printColor(CRGB color) {
   Serial.print("("); Serial.print(color.r); Serial.print(" "); Serial.print(color.g); Serial.print(" "); Serial.print(color.b); Serial.println(")");
+}
+
+void printIntArray(int array[], int len) {
+  Serial.println("");
+  for (int i = 0; i < len; i++) {
+    Serial.print(array[i]); Serial.print(", "); 
+  }
+  Serial.println("");
 }
 
 void printLEDs(CRGB leds[]) {
