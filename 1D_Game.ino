@@ -39,7 +39,7 @@ float heartAnimationStrengthCollected = 30;
 float heartAnimationLengthCollected = 25;
 CRGB heartBaseColor = CRGB(255 - heartAnimationStrengthCollectable, 0, 0);
 // ============================================
-
+ 
 class Player {
 public:
     int pos;
