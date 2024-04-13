@@ -1,15 +1,5 @@
-
-CRGB fadeOutColor(CRGB color) {
-    float fadeDecrease = 100;
-    int minAvgLight = 30;
-
-    // Functions from FastLED library
-    color = color.fadeToBlackBy(fadeDecrease);
-    if (color.getAverageLight() <= minAvgLight) {
-        return blankPixel;
-    }
-    return color;
-}
+// #include "headers/animations.h"
+// using namespace H;
 
 Heart showHeartsCollected(Heart representingHeart, int hearts) {
     representingHeart.pos = 0;
@@ -33,78 +23,20 @@ int showLevelBar(int levelBarPos, int levelsToShow) {
     return levelBarPos;
 }
 
-// c for Color
-int cStep = 5;
-int minColor = 5;
-int maxColor = 255 - minColor;
-CRGB animatePlayerColor(CRGB color) {
-    if (color.r + cStep <= maxColor && color.g <= minColor) {
-        color.r += cStep;
-        color.b -= cStep;
-    } else if (color.g + cStep <= maxColor && color.b <= minColor) {
-        color.g += cStep;
-        color.r -= cStep;
-    } else if (color.b + cStep <= maxColor) {
-        color.b += cStep;
-        color.g -= cStep;
-    } else {
-        color.r -= cStep;
-        color.g -= cStep;
-    }
-    return color;
-}
-
-// Imitate breathing effect
-Enemy animateEnemyColor(Enemy enemy, CRGB baseColor, int animationStrength) {
-    float animationSpeed = 0.2;
-    int damagedColorChange = 12;
-
-    enemy.currPointInAnimation += animationSpeed;
-    if (enemy.currPointInAnimation >= enemyAnimationLength) {
-        enemy.currPointInAnimation = -enemyAnimationLength;
-    }
-    
-    float animationFuncVal = max(0, -1 * pow(enemy.currPointInAnimation / 5 - 1, 4) + 1);
-    // -(x / 5 - 1)^4 + 1
-    int livesLost = enemyLives - enemy.lives;
-    int changeGreen = animationStrength * animationFuncVal;
-    int changeRedBlue = livesLost * damagedColorChange;
-    enemy.color = addValuesToColor(baseColor, changeRedBlue, changeGreen, changeRedBlue);
-    return enemy;
-}
-
-// Imitate heartbeat effect
-Heart animateHeartColor (Heart heart, int animationFunctionRange, int animationStrength) {
-    float animationSpeed = 1;
-
-    heart.currPointInAnimation += animationSpeed;
-    if (heart.currPointInAnimation >= animationFunctionRange) {
-        heart.currPointInAnimation = -animationFunctionRange;
-    }
-    
-    float animationFuncVal = max(0, -1 * pow(heart.currPointInAnimation / 7.07, 4) + pow(heart.currPointInAnimation / 5, 2));
-    // -(x / 7.07)^4 + (x / 5)^2
-    int changeRed = animationStrength * animationFuncVal;
-    heart.color = addValuesToColor(heartBaseColor, changeRed, 0, 0);
-    // Serial.print("Heart Colors: "); Serial.print(animationColorChangeRed); Serial.print(" "); Serial.print(0); Serial.print(" "); printColor(heart.color); Serial.print("\n");
-
-    return heart;
-}
-
 void clearStripe() {
     for (int i = 0; i < NUM_LEDS; i++) {
         LED_STRIPE[i] = blankPixel;
     }
 }
 
-void entryAnimation(int pos, CRGB color, CRGB blankPixel) {
+void entryAnimation(int from, int to, CRGB color, CRGB blankPixel) {
     int slowness = 3;
-    for (int i = 0; i <= pos; i++) {
+    for (int i = from; i <= to; i++) {
         LED_STRIPE[i] = color;
         FastLED.show();
         FastLED.delay(1000 / (UPDATES_PER_SECOND / slowness));
     }
-    for (int i = 0; i <= pos - 1; i++) {
+    for (int i = from; i <= to - 1; i++) {
         LED_STRIPE[i] = blankPixel;
         FastLED.show();
         FastLED.delay(1000 / (UPDATES_PER_SECOND / slowness));
@@ -119,7 +51,6 @@ void winAnimation(int pos) {
     for (int i = 0; i < repeat; i++) {
         for (int j = 0; j < onTime; j++) {
             if (toggle) {
-                player.color = animatePlayerColor(player.color);
                 LED_STRIPE[pos] = player.color;
             } else {
                 LED_STRIPE[pos] = blankPixel;
@@ -132,14 +63,13 @@ void winAnimation(int pos) {
     }
 }
 
-void loseAnimation(int to) {
+void loseAnimation(int pos, int to, CRGB color, CRGB blankPixel) {
     int setbackSpeed = 3;
 
-    while (player.pos - setbackSpeed > to) {
-        player.color = animatePlayerColor(player.color);
-        LED_STRIPE[player.pos] = blankPixel;
-        player.pos -= setbackSpeed;
-        LED_STRIPE[player.pos] = player.color;
+    while (pos - setbackSpeed > to) {
+        LED_STRIPE[pos] = blankPixel;
+        pos -= setbackSpeed;
+        LED_STRIPE[pos] = color;
         
         FastLED.show();
         FastLED.delay(1000 / UPDATES_PER_SECOND);
@@ -159,7 +89,7 @@ void amazingWinAnimation() {
         int colorIndex = startIndex;
         for (int i = 0; i < NUM_LEDS; i++) {
             LED_STRIPE[i] = ColorFromPalette(PartyColors_p, colorIndex, brightness, LINEARBLEND);
-            colorIndex += 3;
+            colorIndex += 5;
         }
         FastLED.show();
         FastLED.delay(1000 / UPDATES_PER_SECOND);

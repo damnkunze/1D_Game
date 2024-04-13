@@ -1,3 +1,5 @@
+#include "headers/helpers.h"
+
 void endGame() {
     Serial.println("GAME CRASHED");
     delay(1000);
@@ -12,22 +14,21 @@ CRGB addColors(CRGB color1, CRGB color2) {
     return newColor;
 }
 
-CRGB addValuesToColor(CRGB color, int red, int green, int blue) {
-    CRGB newColor;
-    newColor.r = color.r + red;
-    newColor.g = color.g + green;
-    newColor.b = color.b + blue;
-    return newColor;
+int constrainInt(int value, int min, int max) {
+    if (value < min) {
+        return min;
+    } else if (value > max) {
+        return max;
+    }
+    return value;
 }
 
-int getFirstEnemyPos() {
-    int firstEnemyPos = NUM_LEDS - 1;
-    for (int i = 0; i < enemyCount; i++) {
-        if (enemies[i].pos != -1 && enemies[i].pos < firstEnemyPos) {
-            firstEnemyPos = enemies[i].pos;
-        }
-    }
-    return firstEnemyPos;
+CRGB addValuesToColor(CRGB color, int red, int green, int blue) {
+    CRGB newColor;
+    newColor.r = constrainInt(color.r + red, 0, 255);
+    newColor.g = constrainInt(color.g + green, 0, 255);
+    newColor.b = constrainInt(color.b + blue, 0, 255);
+    return newColor;
 }
 
 void printIntArray(int array[], int len) {
@@ -38,9 +39,9 @@ void printIntArray(int array[], int len) {
     Serial.println("");
 }
 
-void printLEDs(CRGB leds[]) {
+void printLEDs(CRGB leds[], int length) {
     Serial.println("");
-    for (int i = 0; i < NUM_LEDS; i++) {
+    for (int i = 0; i < length; i++) {
         Serial.print(leds[i].g); 
     }
     Serial.println("");
