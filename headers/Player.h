@@ -14,10 +14,10 @@ namespace P {
 
 class Player {
 public:
-    int pos;
+    float pos;
     CRGB color;
     int lives;
-    int velocity;
+    float velocity;
     int bulletCount;
     Player();
     

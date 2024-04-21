@@ -56,7 +56,7 @@ void Heart::animateColor () {
         this->currPointInAnimation = -animationFunctionRange;
     }
     
-    float animationFuncVal = max(0, -1 * pow(currPointInAnimation / 7.07, 4) + pow(currPointInAnimation / 5, 2));
+    float animationFuncVal = max(0.0, -1 * pow(currPointInAnimation / 7.07, 4) + pow(currPointInAnimation / 5, 2));
     // -(x / 7.07)^4 + (x / 5)^2
     int changeRed = animationStrength * animationFuncVal;
     this->color = addValuesToColor(heartBaseColor, changeRed, 0, 0);

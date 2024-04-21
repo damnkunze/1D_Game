@@ -1,19 +1,21 @@
 #include <FastLED.h>
 #include <math.h>
+#include <Bluepad32.h>
 
 #define NUM_LEDS   300
 #define LED_TYPE   WS2811
 #define BRIGHTNESS 64
 #define COLOR_ORDER GRB
-#define UPDATES_PER_SECOND 100
+#define UPDATES_PER_SECOND 500
 
-#define LED_PIN    5
+#define LED_PIN    22
 #define BUTTON_1_PIN 10
 #define BUTTON_2_PIN 11
 #define BUTTON_3_PIN 12
 
 CRGB LED_STRIPE[NUM_LEDS];
 CRGB blankPixel = CRGB(0, 0, 0);
+ControllerPtr controller;
 
 // ============================================
 
@@ -108,15 +110,58 @@ void startLevel() {
     }
 }
 
+void onConnectedController(ControllerPtr ctl) {
+    controller = ctl; 
+}
+
+void onDisconnectedController(ControllerPtr ctl) {
+    controller = nullptr; 
+}
+
+void dumpGamepad(ControllerPtr ctl) {
+    Serial.printf(
+        "idx=%d, dpad: 0x%02x, buttons: 0x%04x, joystick L: %4d, %4d, joystick R: %4d, %4d, brake: %4d, throttle: %4d, "
+        "misc: 0x%02x, l1: %d, l2: %d, r1: %d, r2: %d, thumbL: %d, thumbR: %d, topLeft: %d, topRight: %d\n",
+        controller->index(),        // Controller Index
+        controller->dpad(),         // D-pad
+        controller->buttons(),      // bitmask of pressed buttons
+        controller->axisX(),        // (-511 - 512) left X Axis
+        controller->axisY(),        // (-511 - 512) left Y axis
+        controller->axisRX(),       // (-511 - 512) right X axis
+        controller->axisRY(),       // (-511 - 512) right Y axis
+        controller->brake(),        // (0 - 1023): brake button
+        controller->throttle(),     // (0 - 1023): throttle (AKA gas) button
+        controller->miscButtons(),  // bitmask of pressed "misc" buttons
+        controller->l1(),           
+        controller->l2(),
+        controller->r1(),
+        controller->r2(),
+        controller->thumbL(),
+        controller->thumbR(),
+        controller->topLeft(),
+        controller->topRight()
+    );
+}
+
 void setup() {
     pinMode(BUTTON_1_PIN, INPUT);
     pinMode(BUTTON_2_PIN, INPUT);
     pinMode(BUTTON_3_PIN, INPUT);
-    Serial.begin(9600);
+    Serial.begin(115200);
 
     delay(1000); // power-up safety delay
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(LED_STRIPE, NUM_LEDS).setCorrection(TypicalLEDStrip);
     FastLED.setBrightness(BRIGHTNESS);
+
+    Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
+    const uint8_t* addr = BP32.localBdAddress();
+    Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+
+    // Setup the Bluepad32 callbacks
+    BP32.setup(&onConnectedController, &onDisconnectedController);
+
+    // "device factory reset", or similar.
+    // BP32.forgetBluetoothKeys();
 
     resetGame();
     startLevel();
@@ -135,7 +180,7 @@ void loop() {
             startLevel();
         } else {
             // Respawn out of range of enemies and pos >= 0
-            int respawnPoint = max(player.pos - enemySpawnDist - 1, healthBarOverPos);
+            int respawnPoint = max((int) player.pos - enemySpawnDist - 1, healthBarOverPos);
             loseAnimation(player.pos, respawnPoint, player.color, blankPixel);
             player.pos = respawnPoint;
         }
@@ -153,33 +198,69 @@ void loop() {
     // Clear stripe blank
     clearStripe();
     
-    buttonMoveForwards = digitalRead(BUTTON_2_PIN);
-    buttonMoveBackwards = digitalRead(BUTTON_1_PIN);
-    buttonShoot = digitalRead(BUTTON_3_PIN);
-    
     // Input controls ===========================
-    player.velocity = 0;
-    if (buttonMoveBackwards == HIGH) {
-        if (player.pos - playerSpeed >= healthBarOverPos) {
-            player.velocity = -playerSpeed;
+    bool dataUpdated = BP32.update();
+    // dumpGamepad(controller);
+    if (dataUpdated && controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
+        float axisMax = 512;
+        float axisYLowThreshold = 50;
+        float axisYHighThreshold = axisMax - 150;
+
+        if (controller->axisY() < -axisYLowThreshold) { // Forward Joystick
+            if (controller->axisY() < -axisYHighThreshold) {
+                player.velocity = playerSpeed;
+
+            } else {
+                float axisIntensity = (abs(controller->axisY()) - axisYLowThreshold) / (axisMax - axisYLowThreshold);
+                player.velocity = playerSpeed * axisIntensity;
+            }
+
+        } else if (controller->axisY() > axisYLowThreshold) {  // Backward Joystick
+            if (controller->axisY() > axisYHighThreshold) {
+                player.velocity = -1 * playerSpeed;
+
+            } else {
+                float axisIntensity = (abs(controller->axisY()) - axisYLowThreshold) / (axisMax - axisYLowThreshold);
+                player.velocity = -1 * playerSpeed * axisIntensity;
+            }
+
+        } else if (controller->x() || controller->b()) { // Forward Button
+            player.velocity = playerSpeed;
+
+        } else if (controller->a()) { // Backward Button
+            player.velocity = -1 * playerSpeed;
+
+        } else { // Only reset velocity if no button is pressed (to avoid lagging between bluetooth packets)
+            player.velocity = 0;
         }
-    } else if (buttonMoveForwards == HIGH) {
-        player.velocity = playerSpeed;
+
+        if (controller->l1() || controller->r1()) { // Shoot
+            isShooting = 1;
+            // Make new bullet
+            int newBulletIndex = findFreeBulletSpace(bullets, 0, MAX_PLAYER_BULLETS);
+            if (player.bulletCount < MAX_PLAYER_BULLETS && newBulletIndex != -1) {
+                bullets[newBulletIndex] = player.shoot();
+                player.animateColor(3); // increase for animation speed
+            }
+        } else {
+            // Shoot only if button was released before
+            isShooting = 0;
+        }
+
+        if (controller->y()) { // Fun stuff
+            static int led = 0;
+            led++;
+            controller->setPlayerLEDs(led & 0x0f);
+        
+            controller->setRumble(128, 128);
+            controller->playDualRumble(0, 1250, 128, 128);
+        }
     }
-    player.pos += player.velocity;
     
-    if (buttonShoot == LOW && isShooting == 0) {
-        isShooting = 1;
-        // Make new bullet
-        int newBulletIndex = findFreeBulletSpace(bullets, 0, MAX_PLAYER_BULLETS);
-        if (player.bulletCount < MAX_PLAYER_BULLETS && newBulletIndex != -1) {
-            bullets[newBulletIndex] = player.shoot();
-            player.animateColor(3); // increase for animation speed
-        }
-    } else if (buttonShoot == HIGH && isShooting == 1) {
-        // Shoot only if button was released before
-        isShooting = 0;
-    }
+    player.pos += player.velocity;
+    if (player.pos < healthBarOverPos) player.pos = healthBarOverPos;
+    if (player.pos > levelBarOverPos) player.pos = levelBarOverPos;
+
     
     // Bullets ===========================
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -263,13 +344,13 @@ void loop() {
             }
 
             if (enemies[i].enemyType == 1) { // basic
-                enemies[i].moveIrregularly(player.pos, NUM_LEDS);
+                enemies[i].moveIrregularly((int) player.pos, NUM_LEDS);
 
             } else if (enemies[i].enemyType == 2) { // shooting
-                enemies[i].moveAwayIrregularly(player.pos, levelBarOverPos, NUM_LEDS);
+                enemies[i].moveAwayIrregularly((int) player.pos, levelBarOverPos, NUM_LEDS);
                 // Shoot only if enemy is in front of player
                 int newBulletIndex = findFreeBulletSpace(bullets, MAX_PLAYER_BULLETS, MAX_ENEMY_BULLETS);
-                if (newBulletIndex != -1 && enemies[i].shouldShoot(player.pos, NUM_LEDS)) {
+                if (newBulletIndex != -1 && enemies[i].shouldShoot((int) player.pos, NUM_LEDS)) {
                     bullets[newBulletIndex] = enemies[i].shoot();
                     // For referencing between enemy and bullet
                     enemies[i].bulletIndex = newBulletIndex;
@@ -293,7 +374,7 @@ void loop() {
 
     // Set player pixel
     player.animateColor(0); // increase for animation speed
-    LED_STRIPE[player.pos] = player.color;
+    LED_STRIPE[(int) player.pos] = player.color;
 
     FastLED.show();
     FastLED.delay(1000 / UPDATES_PER_SECOND);

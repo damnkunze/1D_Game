@@ -20,15 +20,15 @@ Player::Player() {
 }
 
 bool Player::getsHit(int enemyPos) {
-    return (enemyPos <= pos && enemyPos >= pos - velocity);
+    return (enemyPos <= (int) pos && enemyPos >= (int) pos - (int) velocity);
 }
         
 Bullet Player::shoot() {
     bulletCount++;
     // First bullet animation spot is on player and >= 0:
-    int pos = max(this->pos - playerBulletSpeed, 0);
+    int pos = max((int) this->pos - playerBulletSpeed, 0);
     // Velocity is different when player is moving and > 0
-    int velocity = max(this->velocity, 0) + playerBulletSpeed;
+    int velocity = max((int) this->velocity, 0) + playerBulletSpeed;
     return Bullet(pos, 1, velocity, color);
 }       
 

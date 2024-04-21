@@ -92,7 +92,7 @@ bool Enemy::shouldShoot(int playerPos, int num_leds) {
 Bullet Enemy::shoot() {
     int bulletColorChange = 80;
 
-    int bulletPos = max(this->pos - enemyBulletSpeed, 0);
+    int bulletPos = max((int) (this->pos - enemyBulletSpeed), 0);
     CRGB bulletColor = addValuesToColor(this->color, -bulletColorChange, -bulletColorChange, -bulletColorChange);
     return Bullet(bulletPos, 2, enemyBulletSpeed, bulletColor); // 2: enemy
 }
@@ -119,7 +119,7 @@ void Enemy::animateColor() {
         this->currPointInAnimation = -enemyAnimationLength;
     }
     
-    float animationFuncVal = max(0, -1 * pow(this->currPointInAnimation / 5 - 1, 4) + 1);
+    float animationFuncVal = max(0.0, -1 * pow(this->currPointInAnimation / 5 - 1, 4) + 1);
     // -(x / 5 - 1)^4 + 1
 
     if (this->enemyType == 1) {
